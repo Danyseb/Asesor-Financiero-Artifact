@@ -34,7 +34,7 @@ Publicado como artefacto, usa capacidades de la plataforma:
 - `sample`: chat del asesor, captura rápida y categorización con IA.
 - `downloads`: respaldo en `.json`.
 
-Abierto fuera de Claude (por ejemplo, el archivo local), funciona en modo vista previa con datos de ejemplo: se puede navegar y calcular, pero no guarda ni usa IA.
+Abierto fuera de Claude (por ejemplo, el archivo local en un navegador), arranca con datos de ejemplo y guarda solo en ese navegador; el chat y la IA no están disponibles.
 
 ## Cómo actualizarlo
 
