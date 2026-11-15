@@ -24,6 +24,8 @@ Ocho secciones:
 
 Incluye switch de modo claro (blanco y azul) y oscuro (negro y naranja).
 
+Además: editar categorías y presupuestos, buscador y filtros de movimientos, descarga en CSV, deshacer en todo lo que se borra, guía de primeros pasos y ayuda breve.
+
 ## Cómo funciona dentro de Claude
 
 Publicado como artefacto, usa capacidades de la plataforma:
@@ -39,6 +41,13 @@ Abierto fuera de Claude (por ejemplo, el archivo local), funciona en modo vista 
 1. Edita `index.html`.
 2. Pídele a Claude que lo publique en el mismo artefacto (conserva el enlace y los datos).
 3. Haz commit aquí para tener el historial.
+
+## Robustez de los datos
+
+- No guarda nada hasta que tus datos cargan bien; si la carga falla, muestra un error en vez del ejemplo.
+- Migra automáticamente datos de versiones anteriores sin descartar registros.
+- Detecta cambios hechos en otro dispositivo antes de guardar, para no sobrescribirlos.
+- Solo reescribe las secciones que cambiaron; un año con muchos movimientos se reparte en varios documentos.
 
 ## Seguridad
 
