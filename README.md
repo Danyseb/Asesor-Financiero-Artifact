@@ -19,12 +19,28 @@ Ocho secciones:
 - **Cuentas y pagos**: calendario de cortes y límites, alertas a 7 y 2 días.
 - **Mi plan**: diagnóstico inicial, escalera de prioridades, dinero realmente invertible, reparto de ingresos extra y bitácora de decisiones.
 - **Negocios**: margen, punto de equilibrio, tres escenarios, recuperación, ROI y validación.
-- **Inversiones**: fichas con evaluación de 11 puntos, calculadora de posición y bitácora de operaciones.
+- **Inversiones**: registro de acciones (empresa, ticker validado, bolsa, en cartera o en observación, posición y ganancia/pérdida), análisis profesional técnico y fundamental con historial por acción, evaluación de 11 puntos, calculadora de posición y bitácora de operaciones.
 - **Asesor**: chat que lee los datos del tablero.
 
 Incluye switch de modo claro (blanco y azul) y oscuro (negro y naranja).
 
 Además: editar categorías y presupuestos, buscador y filtros de movimientos, descarga en CSV, deshacer en todo lo que se borra, guía de primeros pasos y ayuda breve.
+
+### Análisis de acciones
+
+La página no puede buscar en internet, así que **Analizar** arma un bloque que empieza con "Contexto de mi tablero Asesor Financiero". Se pega en un chat con Claude (la skill `asesor-financiero` busca datos actuales con fuente y fecha) y la respuesta se pega de vuelta para guardarla. El tablero solo muestra precios que traen fuente y fecha, y nunca ejecuta ni simula órdenes.
+
+## Diseño
+
+Un solo matiz por tema (azul en claro, naranja en oscuro) en una escala de tonos con significado:
+
+- Lienzo de la página y barra de pestañas: el tono más tenue.
+- Títulos de sección: el tono más profundo; subtítulos y etiquetas, tono medio-profundo.
+- Marco superior de cada recuadro según su función: consultar (suave), capturar datos (medio), asesor o análisis de Claude (fuerte).
+- Acciones y progreso (botón principal, pestaña activa, barras): el acento puro.
+- Verde, ámbar y rojo solo indican estados.
+
+Tipografía IBM Plex Sans y Plex Mono; espaciado en escala 4/8/12/16/24/32/48 px; contraste WCAG AA en ambos temas.
 
 ## Cómo funciona dentro de Claude
 
