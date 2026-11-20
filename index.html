@@ -396,6 +396,7 @@ const CATS_BASE=[['comida','Comida y súper',3500],['salidas','Restaurantes y sa
 const catsBase=()=>CATS_BASE.map(([id,nombre,presupuesto])=>({id,nombre,presupuesto}));
 const TIPOS_CTA=['debito','credito','efectivo','ahorro'],FRECS=['mensual','anual','unica'],HORIZ=['largo','medio','corto'];
 const VERED=['Sin veredicto','Oportunidad sólida','Vale la pena investigar','Prometedora pero requiere ajustes','Sobrevalorada o poco atractiva','Demasiado riesgosa con la información disponible','No recomendada'];
+const MONV=['Oportunidad','Vigilar','Esperar','Evitar'];
 const BOLSAS=['NASDAQ','NYSE','BMV','BIVA','OTRA'],VAN=['Comprar','Esperar','Evitar','Mantener','Reducir'],CONF=['bajo','medio','alto'];
 const CHECK11=['Qué hace la empresa','Salud financiera','Ventajas competitivas','Valuación actual','Oportunidades de crecimiento','Riesgos principales','Desempeño reciente','Perspectivas','¿El precio actual es atractivo?','Horizonte de inversión','Encaje en mi portafolio'];
 function seed(){
@@ -446,12 +447,12 @@ function seed(){
       objetivos:{corto:'Fondo de emergencia completo',medio:'Equipo DJ propio y primeros eventos pagados',largo:'Independencia financiera'}},
     decisiones:[{id:uid(),fecha:addMonths(cm,-1)+'-03',decision:'Pagar la tarjeta completa cada mes antes de invertir',razon:'La tasa de la tarjeta supera cualquier rendimiento razonable',resultado:''}],
     ideas:[{id:'i1',nombre:'Sets DJ para eventos corporativos',desc:'Paquete de música para lanzamientos, after-office y eventos de marca.',precio:4500,costo:900,fijos:600,inversion:12000,cac:500,u:[1,3,5],check:{pago:false,clientes:true,comp:true,usp:true,minimo:false}}],
-    watch:[{id:'w1',ticker:'ETF-IND',nombre:'Ejemplo: ETF de índice amplio',horizonte:'largo',tesis:'Ejemplo de ficha. Exposición diversificada de bajo costo; la pregunta es el precio y mi horizonte, no la empresa.',check:Array(11).fill(false).map((_,i)=>i<4),granEmpresa:true,buenPrecio:false,precioRef:'',fechaRef:'',precioAtractivo:'',veredicto:'Vale la pena investigar'}],
-    analisis:{},trades:[],chat:[]
+    watch:[{id:'w1',ticker:'ETF-IND',nombre:'Ejemplo: ETF de índice amplio',horizonte:'largo',tesis:'Ejemplo de ficha. Exposición diversificada de bajo costo; la pregunta es el precio y mi horizonte, no la empresa.',check:Array(11).fill(false).map((_,i)=>i<4),granEmpresa:true,buenPrecio:false,precioRef:'',fechaRef:'',precioAtractivo:'',veredicto:'Vale la pena investigar',bolsa:'OTRA',estado:'observacion',acciones:0,precioCompra:0,fechaCompra:'',notas:'',cambioRef:'',fuenteRef:'',refTipo:'max30',umbral:-5}],
+    analisis:{},mon:{},monitor:{maxPct:10,visto:'',ultima:null},trades:[],chat:[]
   };
 }
 function emptyState(){
-  return {meta:{demo:false,v:2},movs:[],reglas:[],metas:[],pagos:[],decisiones:[],ideas:[],watch:[],analisis:{},trades:[],chat:[],
+  return {meta:{demo:false,v:2},movs:[],reglas:[],metas:[],pagos:[],decisiones:[],ideas:[],watch:[],analisis:{},mon:{},monitor:{maxPct:10,visto:'',ultima:null},trades:[],chat:[],
     cuentas:[{id:'deb',nombre:'Débito',tipo:'debito',ultimos4:'',dia_corte:'',dia_limite_pago:'',saldo_actual:0},{id:'efe',nombre:'Efectivo',tipo:'efectivo',ultimos4:'',dia_corte:'',dia_limite_pago:'',saldo_actual:0}],
     categorias:catsBase(),
     plan:{ingresos:[],gastoFijo:0,deudas:[],experiencia:'basica',tolerancia:'media',horizonte:'largo',liquidez:'media',objetivos:{corto:'',medio:'',largo:''}}};
@@ -478,8 +479,13 @@ function normalize(raw){
     decisiones:objs(r.decisiones).map(d=>({...d,id:str(d.id,40)||uid(),fecha:isFecha(d.fecha)?d.fecha:today(),decision:str(d.decision,300)||'Decisión',razon:str(d.razon,300),resultado:str(d.resultado,300)})),
     ideas:objs(r.ideas).map(i=>({...i,id:str(i.id,40)||uid(),nombre:str(i.nombre,80)||'Idea',desc:str(i.desc,300),precio:pos(i.precio),costo:pos(i.costo),fijos:pos(i.fijos),inversion:pos(i.inversion),cac:pos(i.cac),u:[0,1,2].map(k=>pos(arr(i.u)[k])),check:obj(i.check)})),
     watch:objs(r.watch).map(w=>({...w,id:str(w.id,40)||uid(),ticker:str(w.ticker,20)||'—',nombre:str(w.nombre,80),horizonte:oneOf(w.horizonte,HORIZ,'largo'),tesis:str(w.tesis,2000),check:Array.from({length:11},(_,k)=>!!arr(w.check)[k]),granEmpresa:!!w.granEmpresa,buenPrecio:!!w.buenPrecio,precioRef:str(w.precioRef,20),fechaRef:isFecha(w.fechaRef)?w.fechaRef:'',precioAtractivo:str(w.precioAtractivo,20),veredicto:oneOf(w.veredicto,VERED,'Sin veredicto'),
-      bolsa:oneOf(w.bolsa,BOLSAS,'OTRA'),estado:oneOf(w.estado,['cartera','observacion'],'observacion'),acciones:pos(w.acciones),precioCompra:pos(w.precioCompra),fechaCompra:isFecha(w.fechaCompra)?w.fechaCompra:'',notas:str(w.notas,1000),cambioRef:str(w.cambioRef,12),fuenteRef:str(w.fuenteRef,120)})),
+      bolsa:oneOf(w.bolsa,BOLSAS,'OTRA'),estado:oneOf(w.estado,['cartera','observacion'],'observacion'),acciones:pos(w.acciones),precioCompra:pos(w.precioCompra),fechaCompra:isFecha(w.fechaCompra)?w.fechaCompra:'',notas:str(w.notas,1000),cambioRef:str(w.cambioRef,12),fuenteRef:str(w.fuenteRef,120),
+      refTipo:oneOf(w.refTipo,['max30','compra'],'max30'),umbral:(()=>{const u=parseFloat(w.umbral);return isFinite(u)&&u<0&&u>=-90?u:-5})()})),
     analisis:Object.fromEntries(Object.entries(obj(r.analisis)).map(([k,l])=>[k,objs(l).filter(a=>typeof a.texto==='string'&&a.texto).map(a=>({id:str(a.id,40)||uid(),fecha:isFecha(a.fecha)?a.fecha:today(),texto:a.texto.slice(0,16000),veredicto:oneOf(a.veredicto,VAN,''),confianza:oneOf(a.confianza,CONF,''),precio:str(a.precio,20),cambio:str(a.cambio,12),fuente:str(a.fuente,120),fechaPrecio:isFecha(a.fechaPrecio)?a.fechaPrecio:''}))])),
+    mon:Object.fromEntries(Object.entries(obj(r.mon)).map(([k,l])=>[k,objs(l).filter(x=>MONV.includes(x.final)||x.final==='Sin datos').slice(0,30).map(x=>({...x,id:str(x.id,40)||uid(),ts:str(x.ts,20),hora:str(x.hora,40),fuente:str(x.fuente,120),
+      precio:num(x.precio),ref:num(x.ref),dist:x.dist==null||!isFinite(+x.dist)?null:+x.dist,umbral:num(x.umbral),entradaMin:num(x.entradaMin),entradaMax:num(x.entradaMax),stop:num(x.stop),obj1:num(x.obj1),obj2:num(x.obj2),rr:num(x.rr),perdidaPct:num(x.perdidaPct),reentrada:num(x.reentrada),
+      motivo:str(x.motivo,400),cambiaria:str(x.cambiaria,300),cambio:str(x.cambio,12),confianza:oneOf(x.confianza,CONF,''),veredictoIA:oneOf(x.veredictoIA,MONV,''),refTipo:oneOf(x.refTipo,['max30','compra'],'max30')}))])),
+    monitor:(()=>{const m=obj(r.monitor),u=obj(m.ultima);const mp=Math.round(+m.maxPct);return{maxPct:mp>=1&&mp<=100?mp:10,visto:str(m.visto,20),ultima:u.ts?{ts:str(u.ts,20),n:pos(u.n),texto:str(u.texto,20000)}:null}})(),
     trades:objs(r.trades).map(t=>({...t,id:str(t.id,40)||uid(),fecha:isFecha(t.fecha)?t.fecha:today(),ticker:str(t.ticker,20)||'—',lado:oneOf(t.lado,['largo','corto'],'largo'),entrada:num(t.entrada),stop:num(t.stop),salida:pos(t.salida),tam:num(t.tam),razon:str(t.razon,200),emocion:str(t.emocion,30)})),
     chat:objs(r.chat).filter(m=>(m.role==='user'||m.role==='assistant')&&typeof m.content==='string'&&m.content).map(m=>({role:m.role,content:m.content.slice(0,20000)}))};
 }
@@ -488,9 +494,10 @@ function normalize(raw){
 /* Claves (no cambian): un documento por sección en data/users/<id>/ con {v: JSON}; movimientos por año en movs_<año>
    (y movs_<año>_p2… solo si un año crece demasiado para un documento). Fuera de Claude: localStorage 'af_state_v1'. */
 let S=seed();
-const KEYS=['meta','cuentas','categorias','reglas','metas','pagos','plan','decisiones','ideas','watch','trades','chat'];
+const KEYS=['meta','cuentas','categorias','reglas','metas','pagos','plan','decisiones','ideas','watch','trades','chat','monitor'];
 const LS_KEY='af_state_v1',MAXDOC=100000;
 function chunkMovs(list){const out=[];let cur=[],size=2;for(const m of list){const s=JSON.stringify(m);if(cur.length&&size+s.length+1>MAXDOC){out.push('['+cur.join(',')+']');cur=[];size=2}cur.push(s);size+=s.length+1}out.push('['+cur.join(',')+']');return out}
+const monKey=id=>'mon_'+String(id).replace(/[^A-Za-z0-9_\-]/g,'_').slice(0,60);
 const anKey=id=>'an_'+String(id).replace(/[^A-Za-z0-9_\-]/g,'_').slice(0,60);
 const metaCore=()=>JSON.stringify({...S.meta,rev:undefined});
 const SAVE_ERR={quota_exceeded:'espacio lleno',revoked:'se perdió el acceso; recarga la página',resource_exhausted:'demasiados cambios seguidos',invalid_argument:'dato demasiado grande'};
@@ -536,8 +543,10 @@ const store={mode:'loading',ready:false,db:null,base:'',timer:null,flushing:fals
       for(let i=1;i<=n;i++){const k=i===1?`movs_${y}`:`movs_${y}_p${i}`;const raw=await this.read(k);if(raw==null)continue;try{movs.push(...arr(JSON.parse(raw)));last[k]=raw}catch(e){bad.push(k)}}}));
     const analisis={};
     await Promise.all(objs(got.watch).map(async w=>{if(!w.id)return;const k=anKey(w.id);const raw=await this.read(k);if(raw==null)return;try{analisis[w.id]=arr(JSON.parse(raw));last[k]=raw}catch(e){bad.push(k)}}));
+    const mon={};
+    await Promise.all(objs(got.watch).map(async w=>{if(!w.id)return;const k=monKey(w.id);const raw=await this.read(k);if(raw==null)return;try{mon[w.id]=arr(JSON.parse(raw));last[k]=raw}catch(e){bad.push(k)}}));
     if(bad.length)throw Object.assign(new Error('Secciones ilegibles: '+bad.join(', ')),{code:'corrupt'});
-    S=normalize({...got,movs,analisis});this.last=last;this.rev=meta.rev;this.lastCore=JSON.stringify({...meta,rev:undefined});
+    S=normalize({...got,movs,analisis,mon});this.last=last;this.rev=meta.rev;this.lastCore=JSON.stringify({...meta,rev:undefined});
   },
   save(){
     if(!this.ready||S.meta.demo){this.status();return}
@@ -558,7 +567,8 @@ const store={mode:'loading',ready:false,db:null,base:'',timer:null,flushing:fals
         const docs={},parts={};
         for(const y of years){const ch=chunkMovs(S.movs.filter(m=>m.fecha.startsWith(y)));parts[y]=ch.length;ch.forEach((c,i)=>{docs[i?`movs_${y}_p${i+1}`:`movs_${y}`]=c})}
         for(const w of S.watch){const l=arr(S.analisis[w.id]);while(l.length>1&&JSON.stringify(l).length>MAXDOC)l.pop();const k=anKey(w.id);if(l.length||k in this.last)docs[k]=JSON.stringify(l)}
-        for(const k of Object.keys(this.last))if((k.startsWith('movs_')||k.startsWith('an_'))&&!(k in docs))docs[k]='[]';
+        for(const w of S.watch){const l=arr(S.mon[w.id]);const k=monKey(w.id);if(l.length||k in this.last)docs[k]=JSON.stringify(l)}
+        for(const k of Object.keys(this.last))if((k.startsWith('movs_')||k.startsWith('an_')||k.startsWith('mon_'))&&!(k in docs))docs[k]='[]';
         if(Object.values(parts).some(n=>n>1))S.meta.parts=parts;else delete S.meta.parts;
         for(const k of KEYS)if(k!=='meta')docs[k]=JSON.stringify(S[k]);
         const changed=Object.keys(docs).filter(k=>docs[k]!==this.last[k]);const core=metaCore();
@@ -715,7 +725,7 @@ const pendientes=()=>memo('pend',()=>S.movs.filter(m=>m.revisar||(m.tipo==='gast
 /* ================= navegación y render ================= */
 const TABS=[['resumen','Resumen'],['movimientos','Movimientos'],['metas','Metas'],['pagos','Cuentas y pagos'],['plan','Mi plan'],['negocios','Negocios'],['inversiones','Inversiones'],['asesor','Asesor']];
 let VIEW='resumen',MES=curYM(),_lastView=null;
-const UI={ideaSel:null,watchSel:null,csv:null,quick:null,gapText:{},calMes:curYM(),open:new Set(),f:{q:'',cat:'',tipo:'',scope:'mes'},asig:null,calc:null,restore:null,dump:null,inv:{filtro:'todas',bloque:null,borrar:null}};
+const UI={ideaSel:null,watchSel:null,csv:null,quick:null,gapText:{},calMes:curYM(),open:new Set(),f:{q:'',cat:'',tipo:'',scope:'mes'},asig:null,calc:null,restore:null,dump:null,inv:{filtro:'todas',bloque:null,borrar:null,monBloque:false}};
 function go(v){if(!TABS.some(t=>t[0]===v))v='resumen';VIEW=v;render();window.scrollTo(0,0);try{history.replaceState(null,'','#'+v)}catch(e){}}
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(h&&h!==VIEW&&TABS.some(t=>t[0]===h)){VIEW=h;render()}});
 document.addEventListener('click',ev=>{const a=ev.target.closest&&ev.target.closest('a[href^="#"]');if(!a)return;ev.preventDefault();go(a.getAttribute('href').slice(1))},true);
@@ -1287,6 +1297,161 @@ function mdAn(t){
   for(const l of String(t).split('\n')){if(/^\s*\|.*\|\s*$/.test(l)){fBuf();tbl.push(l)}else{fTbl();buf.push(l)}}
   fBuf();fTbl();return parts.join('');
 }
+/* ---------- Monitor de oportunidades ---------- */
+/* Regla principal: proteger el capital primero. Ninguna señal es segura; toda oportunidad muestra pérdida posible e invalidación. */
+const monDe=id=>arr(S.mon[id]);
+const ahora=()=>{const d=new Date();return `${today()} ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const fechaHora=s=>{if(!s)return '—';const[f,h]=String(s).split(' ');return isFecha(f)?`${fechaCorta(f)} ${f.slice(0,4)}${h?' · '+h:''}`:esc(s)};
+const monClase=v=>({Oportunidad:'v-ok',Vigilar:'v-warn',Evitar:'v-bad'})[v]||'';
+const nFin=x=>{const n=parseNum(x);return isFinite(n)&&n>0?n:0};
+/* Valor de la cartera registrada (costo) en la misma moneda de la acción, para el tamaño máximo de posición. */
+const carteraEn=b=>{const m=MONEDA[b]||'';return sum(S.watch.filter(x=>x.estado==='cartera'&&(MONEDA[x.bolsa]||'')===m),x=>x.acciones*x.precioCompra)};
+/* Aplica tus reglas sobre lo que trajo el análisis. Las reglas pueden bajar un veredicto, nunca subirlo. */
+function evaluarMon(w,d){
+  const r={precio:nFin(d.precio),cambio:d.cambio,max30:nFin(d.max_30d),refTipo:w.refTipo,umbral:w.umbral,veredictoIA:oneOf(d.veredicto,MONV,''),final:'',motivo:'',ref:0,dist:null,
+    entradaMin:nFin(d.entrada_min),entradaMax:nFin(d.entrada_max),stop:nFin(d.stop),obj1:nFin(d.objetivo1),obj2:nFin(d.objetivo2),reentrada:nFin(d.reentrada),reentradaCalc:false,rr:0,perdidaPct:0};
+  if(!r.precio){r.final='Sin datos';r.motivo='El análisis no trajo un precio con fuente y hora.';return r}
+  r.ref=r.refTipo==='compra'?w.precioCompra:r.max30;
+  if(!(r.ref>0)){r.final='Sin datos';r.motivo=r.refTipo==='compra'?'No registraste precio de compra para usarlo como referencia.':'El análisis no trajo el máximo de 30 días con fuente.';return r}
+  r.dist=(r.precio-r.ref)/r.ref*100;
+  if(r.entradaMin&&r.entradaMax&&r.entradaMin>r.entradaMax)[r.entradaMin,r.entradaMax]=[r.entradaMax,r.entradaMin];
+  const mid=r.entradaMin&&r.entradaMax?(r.entradaMin+r.entradaMax)/2:(r.entradaMin||r.entradaMax);
+  if(mid&&r.stop&&r.stop<mid){r.perdidaPct=(mid-r.stop)/mid*100;if(r.obj1>mid)r.rr=(r.obj1-mid)/(mid-r.stop)}
+  if(r.dist>r.umbral){
+    r.final=r.veredictoIA==='Evitar'?'Evitar':'Esperar';
+    if(!r.reentrada){r.reentrada=Math.round(r.ref*(1+r.umbral/100)*100)/100;r.reentradaCalc=true}
+    r.motivo=r.final==='Evitar'?'El análisis detectó un problema de fondo.':`No cruzó tu umbral de ${r.umbral}%: sin aviso de compra hasta que vuelva a una zona atractiva.`;
+    return r;
+  }
+  if(d.tipo_caida==='deterioro'){r.final='Evitar';r.motivo='Cruzó el umbral, pero la caída es por deterioro del negocio: el precio bajo no la hace barata.';return r}
+  const v=r.veredictoIA||'Vigilar';
+  if(v!=='Oportunidad'){r.final=v;r.motivo=`Cruzó el umbral; el análisis recomienda ${v.toLowerCase()}.`;return r}
+  if(!mid||!r.stop||!r.obj1){r.final='Vigilar';r.motivo='Cruzó el umbral, pero el plan no trae zona de entrada, stop y objetivo con datos: no se marca como oportunidad.';return r}
+  if(r.rr<2){r.final='Vigilar';r.motivo=`La relación riesgo/beneficio es ${r.rr.toFixed(2)}:1, menor a 1:2: no se marca como oportunidad.`;return r}
+  if(d.tipo_caida!=='sana'){r.final='Vigilar';r.motivo='El análisis no confirmó que la caída sea sana.';return r}
+  r.final='Oportunidad';r.motivo='Cruzó el umbral, caída sana y riesgo/beneficio de al menos 1:2.';return r;
+}
+function parseMonitor(t){
+  const out=[];
+  for(const m of String(t).matchAll(/MONITOR\s*:([^\n]+)/gi)){
+    const kv={};m[1].split(';').forEach(x=>{const i=x.indexOf('=');if(i>0)kv[plain(x.slice(0,i)).trim().replace(/\s+/g,'_')]=x.slice(i+1).trim()});
+    const nd=v=>/^(nd|n\/d|sin datos?|)$/i.test(String(v||'').trim());
+    const tk=String(kv.ticker||'').toUpperCase().trim();if(!tk)continue;
+    const c=parseFloat(String(kv.cambio_1d||'').replace(',','.'));
+    const fuenteOk=!nd(kv.fuente)&&!nd(kv.hora);
+    const v=MONV.find(x=>plain(kv.veredicto||'').startsWith(plain(x)))||'';
+    const cf=plain(kv.confianza||'');const tc=plain(kv.tipo_caida||'');
+    out.push({ticker:tk,bolsa:String(kv.bolsa||'').toUpperCase().trim(),
+      precio:fuenteOk&&!nd(kv.precio)?kv.precio:'',cambio:fuenteOk&&isFinite(c)?String(c):'',max_30d:fuenteOk&&!nd(kv.max_30d)?kv.max_30d:'',
+      hora:fuenteOk?kv.hora.slice(0,40):'',fuente:fuenteOk?kv.fuente.slice(0,120):'',veredicto:v,
+      confianza:/^baj/.test(cf)?'bajo':/^med/.test(cf)?'medio':/^alt/.test(cf)?'alto':'',
+      tipo_caida:/^san/.test(tc)?'sana':/^deter/.test(tc)?'deterioro':'',
+      entrada_min:kv.entrada_min,entrada_max:kv.entrada_max,stop:kv.stop,objetivo1:kv.objetivo1,objetivo2:kv.objetivo2,reentrada:kv.reentrada,
+      cambiaria:nd(kv.que_cambiaria)?'':String(kv.que_cambiaria||'').slice(0,300)});
+  }
+  return out;
+}
+function bloqueMonitor(){
+  const D=diagnostico(),P=S.plan;
+  const acciones=S.watch.map(w=>({ticker:w.ticker,empresa:w.nombre,bolsa:w.bolsa,moneda:MONEDA[w.bolsa]||'desconocida',estado:w.estado==='cartera'?'En cartera':'En observación',
+    acciones:w.acciones||0,precio_promedio_compra:w.precioCompra||'no registrado',fecha_compra:w.fechaCompra||'no registrada',
+    referencia:w.refTipo==='compra'?'mi precio de compra':'máximo de los últimos 30 días',umbral_caida_pct:w.umbral,ultimo_veredicto_monitor:(monDe(w.id)[0]||{}).final||'ninguno'}));
+  const datos={fecha_y_hora:ahora(),acciones,tamano_maximo_por_accion_pct_de_cartera:S.monitor.maxPct,
+    perfil:{tolerancia_riesgo:P.tolerancia,horizonte:P.horizonte,experiencia:P.experiencia,peldano_actual:D.steps[D.actual].t,dinero_invertible_hoy_mxn:Math.round(D.invertible),deudas_caras_mxn:Math.round(sum(D.caras,d=>d.saldo))}};
+  return `Contexto de mi tablero Asesor Financiero
+Revisión del monitor de oportunidades · ${ahora()}
+
+DATOS (JSON):
+${JSON.stringify(datos,null,1)}
+
+INSTRUCCIÓN DE ANÁLISIS
+Actúa como analista bursátil profesional con enfoque de valor estilo Buffett-Munger más análisis técnico. Busca en internet datos actuales de cada acción antes de responder.
+
+Regla principal, por encima de todo: proteger mi capital primero y buscar ganancias después. Nunca presentes una señal como segura ni garantices resultados.
+
+Reglas obligatorias:
+- Nunca inventes ni estimes precios o indicadores. Cada dato numérico lleva su fuente y la hora de consulta. Si no hay datos confiables, escribe "Sin datos".
+- No ejecutes ni simules órdenes. Solo avisa y analiza; la decisión es mía.
+- Responde en español.
+
+Para cada acción:
+1. Precio actual, cambio de 1 día y máximo de los últimos 30 días, con fuente y hora.
+2. Calcula la distancia del precio a mi referencia y si cruzó mi umbral de caída.
+3. Si NO cruzó el umbral, o la acción está subiendo o cara: veredicto "Esperar" con un precio de reentrada sugerido. No propongas compra.
+4. Si cruzó el umbral, distingue antes de concluir:
+   a) Caída sana: corrección de mercado, toma de utilidades, sobreventa técnica, fundamentales intactos. Puede ser oportunidad.
+   b) Caída por deterioro: malos resultados, deuda, fraude, pérdida de ventaja competitiva, ruptura de soportes clave con volumen alto. Se marca "Evitar" aunque el precio esté bajo.
+5. Técnico: tendencia primaria y secundaria, soportes y resistencias, medias de 50 y 200 días, RSI (sobreventa por debajo de 30), MACD, volumen frente a su promedio, patrones de gráfico (doble suelo, hombro-cabeza-hombro, banderas, canales) indicando si cada uno está confirmado o en formación.
+6. Fundamental: P/E frente al sector, crecimiento de ingresos y utilidades, deuda, flujo de caja libre, moat.
+7. Contexto: noticias de los últimos 7 días y fecha del próximo reporte de resultados.
+8. Si es oportunidad, el plan incluye: zona de entrada (rango), compra escalonada en 3 partes, precio de invalidación o stop con la pérdida máxima estimada en $ y en %, objetivos de ganancia 1 y 2, relación riesgo/beneficio (si es menor a 1:2 NO es oportunidad) y tamaño máximo de posición (no más del ${S.monitor.maxPct}% de mi cartera por acción).
+9. Veredicto: Oportunidad / Vigilar / Esperar / Evitar, con nivel de confianza (bajo, medio o alto) y qué cambiaría la conclusión.
+10. Cierra con las fuentes y la hora del análisis.
+
+Al final, escribe UNA línea por acción, exactamente con este formato, para que mi tablero la lea (usa ND donde no tengas un dato confiable; números sin símbolo de moneda):
+MONITOR: ticker=<ticker>; bolsa=<bolsa>; precio=<n>; cambio_1d=<% con signo>; max_30d=<n>; hora=<AAAA-MM-DD HH:MM>; fuente=<sitio>; tipo_caida=<sana|deterioro|ninguna>; veredicto=<Oportunidad|Vigilar|Esperar|Evitar>; confianza=<bajo|medio|alto>; entrada_min=<n>; entrada_max=<n>; stop=<n>; objetivo1=<n>; objetivo2=<n>; reentrada=<n>; que_cambiaria=<texto breve>`;
+}
+const monNuevas=()=>S.watch.flatMap(w=>monDe(w.id).filter(r=>r.final==='Oportunidad'&&(!S.monitor.visto||r.ts>S.monitor.visto)).map(r=>({w,r})));
+function monTarjeta(x){
+  const r=monDe(x.id)[0];if(!r)return `<span class="small faint" style="display:block">Monitor: sin revisión</span>`;
+  const dist=r.dist==null?'':(r.dist<=r.umbral?`cruzó el umbral (${r.dist.toFixed(1)}%)`:`a ${(r.dist-r.umbral).toFixed(1)} pts del umbral`);
+  return `<span class="small" style="display:block;margin-top:2px"><span class="pill ${monClase(r.final)}">${r.final}</span> <span class="faint">${dist?dist+' · ':''}${fechaHora(r.hora||r.ts)}</span></span>`;
+}
+function monPlan(w,r){
+  const b=w.bolsa,mid=r.entradaMin&&r.entradaMax?(r.entradaMin+r.entradaMax)/2:(r.entradaMin||r.entradaMax);
+  const cart=carteraEn(b),maxMonto=cart*S.monitor.maxPct/100,perdMonto=maxMonto*r.perdidaPct/100;
+  const filas=[];
+  if(r.final==='Esperar'&&r.reentrada)filas.push(['Precio de reentrada',`${fmtP(r.reentrada,b)}${r.reentradaCalc?' <span class="faint">(calculado con tu umbral)</span>':''}`]);
+  if(mid){filas.push(['Zona de entrada',`${fmtP(r.entradaMin||mid,b)} – ${fmtP(r.entradaMax||mid,b)}`]);
+    if(r.entradaMin&&r.entradaMax)filas.push(['Compra escalonada (3 partes)',[r.entradaMax,mid,r.entradaMin].map(p=>fmtP(p,b)).join(' · ')])}
+  if(r.stop)filas.push(['Invalidación (stop)',`<strong>${fmtP(r.stop,b)}</strong>`]);
+  if(r.perdidaPct)filas.push(['Pérdida si falla',`<strong class="down">−${r.perdidaPct.toFixed(1)}%</strong> por acción (${fmtP(mid-r.stop,b)})${maxMonto?` · con la posición máxima: <strong class="down">−${fmtP(perdMonto,b)}</strong>`:''}`]);
+  if(r.obj1)filas.push(['Objetivos',`${fmtP(r.obj1,b)}${r.obj2?' · '+fmtP(r.obj2,b):''}`]);
+  if(r.rr)filas.push(['Riesgo/beneficio',`<span class="${r.rr>=2?'up':'down'}">1:${r.rr.toFixed(2)}</span>`]);
+  if(mid)filas.push(['Tamaño máximo',maxMonto?`${fmtP(maxMonto,b)} (${S.monitor.maxPct}% de tu cartera en ${MONEDA[b]||'esa moneda'})`:`${S.monitor.maxPct}% de tu cartera (registra tus posiciones en cartera para calcular el monto)`]);
+  return filas.length?`<div class="list" style="margin-top:var(--s2)">${filas.map(([k,v])=>`<div class="li"><span class="small muted">${k}</span><span class="small${k==='Tamaño máximo'?'':' num'}" style="text-align:right">${v}</span></div>`).join('')}</div>`:'';
+}
+function monDetalle(w){
+  const b=`watch|${esc(w.id)}|`,h=monDe(w.id),r=h[0],p=r&&r.precio;
+  const cfg=`<div class="form" style="margin-top:var(--s2)">
+    <label class="f">Precio de referencia<select data-b="${b}refTipo|ref"><option value="max30" ${w.refTipo!=='compra'?'selected':''}>Máximo de 30 días</option><option value="compra" ${w.refTipo==='compra'?'selected':''}>Mi precio de compra</option></select></label>
+    <label class="f">Umbral de caída %<input type="number" step="0.5" max="-0.5" min="-90" inputmode="decimal" data-b="${b}umbral|umbral" value="${w.umbral}"></label></div>`;
+  const ult=r?`<div class="spread" style="margin-top:var(--s3)"><span><span class="pill ${monClase(r.final)}">${r.final}</span>${r.confianza?` <span class="small muted">confianza ${r.confianza}</span>`:''}</span><span class="small faint">Revisión: ${fechaHora(r.hora||r.ts)}</span></div>
+    ${p?`<p class="small" style="margin-top:var(--s2)"><span class="num">${fmtP(p,w.bolsa)}</span>${r.cambio!==''&&isFinite(+r.cambio)?` <span class="num ${+r.cambio>=0?'up':'down'}">${+r.cambio>0?'+':''}${(+r.cambio).toFixed(2)}%</span>`:''} <span class="faint">· ${esc(r.fuente)} · ${fechaHora(r.hora)}</span></p>
+      <p class="small muted">Referencia ${r.refTipo==='compra'?'(tu compra)':'(máx. 30 días)'}: ${r.ref?fmtP(r.ref,w.bolsa):'Sin datos'}${r.dist!=null?` · distancia ${r.dist>=0?'+':''}${r.dist.toFixed(1)}% · umbral ${r.umbral}%`:''}</p>`:'<p class="small muted" style="margin-top:var(--s2)">Sin datos</p>'}
+    <p class="note" style="margin-top:var(--s2)">${esc(r.motivo)}${r.veredictoIA&&r.veredictoIA!==r.final?` (el análisis decía: ${r.veredictoIA})`:''}</p>
+    ${monPlan(w,r)}
+    ${r.cambiaria?`<p class="small muted" style="margin-top:var(--s2)"><strong>Qué cambiaría la conclusión:</strong> ${esc(r.cambiaria)}</p>`:''}`
+    :'<p class="small muted" style="margin-top:var(--s2)">Aún sin revisión. Usa “Generar revisión” arriba.</p>';
+  const actual=p||0;
+  const hist=h.length?`<div style="margin-top:var(--s3)">${det('monh-'+w.id,`Historial de alertas (${h.length})`,`<div class="tbl-wrap"><table><thead><tr><th>Revisión</th><th>Veredicto</th><th class="r">Precio al aviso</th><th class="r">Desde entonces</th></tr></thead><tbody>
+    ${h.map(x=>`<tr><td class="num small">${fechaHora(x.hora||x.ts)}</td><td><span class="pill ${monClase(x.final)}">${x.final}</span></td><td class="r num">${x.precio?fmtP(x.precio,w.bolsa):'Sin datos'}</td>
+      <td class="r num">${x.precio&&actual&&x!==r?`<span class="${actual>=x.precio?'up':'down'}">${actual>=x.precio?'+':''}${((actual-x.precio)/x.precio*100).toFixed(1)}%</span>`:'—'}</td></tr>`).join('')}
+    </tbody></table></div><p class="small faint" style="margin-top:var(--s2)">“Desde entonces” compara contra el precio de la revisión más reciente, para ver si las señales funcionaron.</p>`)}</div>`:'';
+  return `<h3 style="margin-top:var(--s4)">Monitor de oportunidades</h3>${cfg}${ult}${hist}`;
+}
+function monPanel(){
+  const nuevas=monNuevas(),u=S.monitor.ultima;
+  const ban=nuevas.length?`<div class="banner" style="border-color:var(--ok);background:var(--ok-soft)"><div><p><strong>${nuevas.length} oportunidad${nuevas.length>1?'es':''} nueva${nuevas.length>1?'s':''} desde tu última visita</strong></p>
+    ${nuevas.map(({w,r})=>`<p class="small">${esc(w.ticker)}: entrada ${fmtP(r.entradaMin||r.entradaMax,w.bolsa)}–${fmtP(r.entradaMax||r.entradaMin,w.bolsa)} · stop ${fmtP(r.stop,w.bolsa)} · pérdida si falla <strong class="down">−${r.perdidaPct.toFixed(1)}%</strong> · R/B 1:${r.rr.toFixed(2)}</p>`).join('')}
+    <p class="small muted">Ninguna señal es segura. Revisa el plan completo en cada acción antes de decidir.</p></div>
+    <button type="button" data-a="monVisto">Marcar como vistas</button></div>`:'';
+  const bl=UI.inv.monBloque?`<div style="margin-top:var(--s4)">
+      <h3>1. Copia este bloque y pégalo en un chat con Claude</h3>
+      <textarea class="bloque" id="monBloqueTxt" readonly aria-label="Bloque de revisión">${esc(bloqueMonitor())}</textarea>
+      <div class="row" style="margin-top:var(--s2)"><button type="button" data-a="copiarMon">Copiar bloque</button></div>
+      <h3 style="margin-top:var(--s4)">2. Pega aquí la respuesta completa</h3>
+      <form id="monForm" style="display:grid;gap:var(--s2);margin-top:var(--s2)"><textarea id="mon_txt" required aria-label="Respuesta de la revisión" style="min-height:150px" placeholder="Pega aquí la respuesta, incluidas las líneas MONITOR del final"></textarea>
+        <div class="row"><button type="submit" class="primary">Guardar revisión</button><button type="button" class="ghost" data-a="cerrarMon">Cancelar</button></div></form></div>`:'';
+  return `${ban}<div class="panel t-ia"><div class="panel-h"><div><h2>Monitor de oportunidades</h2><p class="small muted">Última revisión: ${u&&u.ts?fechaHora(u.ts):'ninguna'}${u&&u.n?` · ${u.n} acciones`:''}</p></div>
+    <div class="row"><label class="f" style="width:150px">Máximo por acción<span class="row" style="flex-wrap:nowrap;gap:var(--s1)"><input type="number" min="1" max="100" step="1" inputmode="numeric" data-mon="maxPct" value="${S.monitor.maxPct}" aria-label="Máximo por acción, % de tu cartera"><span class="small">%</span></span></label>
+    ${S.watch.length?`<button type="button" class="primary" data-a="generarMon">Generar revisión</button>`:''}</div></div>
+    <p class="small muted">Revisa todas tus acciones contra su umbral de caída. Si una cruza el umbral, distingue caída sana de deterioro y solo marca <strong>Oportunidad</strong> con zona de entrada, stop y riesgo/beneficio de al menos 1:2. Las que suben o están caras quedan en <strong>Esperar</strong>.</p>
+    <p class="small muted" style="margin-top:var(--s2)">Esta página no puede consultar precios ni buscar en internet, así que la revisión se hace pegando un bloque en el chat; no se repite sola.</p>
+    ${bl}
+    <p class="small faint" style="margin-top:var(--s3)">Análisis informativo; no garantiza resultados.</p></div>`;
+}
+
 function accionesHTML(){
   const f=UI.inv.filtro,lista=S.watch.filter(w=>f==='todas'||w.estado===f),w=watchSel();
   const n={todas:S.watch.length,cartera:S.watch.filter(x=>x.estado==='cartera').length,observacion:S.watch.filter(x=>x.estado==='observacion').length};
@@ -1295,7 +1460,7 @@ function accionesHTML(){
       <span class="spread"><span><strong>${esc(x.ticker)}</strong> <span class="small faint">${esc(x.bolsa)}</span></span>${u&&u.veredicto?`<span class="pill ${vClase(u.veredicto)}">${u.veredicto}</span>`:'<span class="pill">Sin análisis</span>'}</span>
       <span class="small muted" style="display:block">${esc(x.nombre)} · ${x.estado==='cartera'?'En cartera':'En observación'}</span>
       <span class="small" style="display:block">${p>0?`<span class="num">${fmtP(p,x.bolsa)}</span>${isFinite(c)?` <span class="num ${c>=0?'up':'down'}">${c>0?'+':''}${c.toFixed(2)}%</span>`:''} <span class="faint">· ${x.fechaRef?fechaCorta(x.fechaRef):'sin fecha'}</span>`:'<span class="faint">Sin precio registrado</span>'}</span>
-      <span class="small faint" style="display:block">${u?'Último análisis: '+fechaLarga(u.fecha):'Aún sin análisis'}</span></span></button>`};
+      <span class="small faint" style="display:block">${u?'Último análisis: '+fechaLarga(u.fecha):'Aún sin análisis'}</span>${monTarjeta(x)}</span></button>`};
   const alta=`<form id="accForm" class="form" style="margin-top:var(--s3)">
       <label class="f" style="grid-column:1/-1">Empresa<input id="ac_n" required maxlength="80" placeholder="Ej. Walmart de México"></label>
       <label class="f">Ticker<input id="ac_t" required maxlength="15" autocapitalize="characters" placeholder="WALMEX *"></label>
@@ -1312,7 +1477,7 @@ function accionesHTML(){
       ${lista.length?`<div class="list">${lista.map(tarjeta).join('')}</div>`:'<p class="small muted">Ninguna acción con este filtro.</p>'}
       <div style="margin-top:var(--s3)">${det('nuevaAccion','Agregar acción',alta)}</div>`
     :`<div class="empty"><p><strong>Agrega tu primera acción</strong></p><p class="small" style="margin-top:var(--s1)">Regístrala en cartera si ya la tienes, o en observación si la estás estudiando.</p></div>${alta}`}</div>`;
-  if(!w)return `<div class="banner"><p class="small">El análisis usa datos actuales de internet. Como esta página no puede buscar en la web, “Analizar” arma un bloque para pegar en un chat con Claude y aquí guardas la respuesta.</p></div><div class="split">${izq}<div class="panel t-info"><div class="empty">Cuando agregues una acción, aquí verás su posición, su análisis y su historial.</div></div></div>`;
+  if(!w)return monPanel()+`<div class="banner"><p class="small">El análisis usa datos actuales de internet. Como esta página no puede buscar en la web, “Analizar” arma un bloque para pegar en un chat con Claude y aquí guardas la respuesta.</p></div><div class="split">${izq}<div class="panel t-info"><div class="empty">Cuando agregues una acción, aquí verás su posición, su análisis y su historial.</div></div></div>`;
   const b=`watch|${esc(w.id)}|`,po=posicion(w),hist=anDe(w.id),u=hist[0];
   const confirm=UI.inv.borrar===w.id?`<div class="banner err" style="margin-bottom:var(--s3)"><p class="small"><strong>¿Eliminar ${esc(w.ticker)}?</strong> Se borran sus datos y sus ${hist.length} análisis guardados. Podrás deshacerlo unos segundos.</p><div class="row"><button type="button" data-a="borrarWatch" data-id="${esc(w.id)}" class="danger">Sí, eliminar</button><button type="button" class="ghost" data-a="cancelarBorrar">Cancelar</button></div></div>`:'';
   const bloque=UI.inv.bloque===w.id?`<div class="panel t-ia" style="margin-top:var(--s4)">
@@ -1339,7 +1504,8 @@ function accionesHTML(){
       ${po.act?`<div class="kpi"><div class="eyebrow">Ganancia / pérdida</div><div class="v ${po.pl>=0?'up':'down'}">${po.pl>=0?'+':'−'}${fmtP(Math.abs(po.pl),w.bolsa)}</div><div class="s"><span class="${po.pl>=0?'up':'down'}">${po.pl>=0?'+':''}${(po.plp*100).toFixed(2)}%</span> · precio del ${w.fechaRef?fechaLarga(w.fechaRef):'—'}${w.fuenteRef?' · '+esc(w.fuenteRef):''}</div></div>`
         :`<div class="kpi"><div class="eyebrow">Ganancia / pérdida</div><div class="v">—</div><div class="s">Sin precio actual con fuente</div></div>`}</div>`:''}
     ${w.fechaRef&&daysBetween(w.fechaRef,today())>7?`<p class="note warn" style="margin-bottom:var(--s3)">El precio registrado tiene ${daysBetween(w.fechaRef,today())} días. No lo uses como dato actual: analiza de nuevo.</p>`:''}
-    ${det('datos-'+w.id,'Editar datos de la acción',`<div class="form" style="margin-top:var(--s2)">
+    ${monDetalle(w)}
+    <div style="margin-top:var(--s4)">${det('datos-'+w.id,'Editar datos de la acción',`<div class="form" style="margin-top:var(--s2)">
       <label class="f" style="grid-column:span 2">Empresa<input data-b="${b}nombre|s" value="${esc(w.nombre)}" maxlength="80"></label>
       <label class="f">Ticker<input data-b="${b}ticker|tk" value="${esc(w.ticker)}" maxlength="15"></label>
       <label class="f">Bolsa<select data-b="${b}bolsa|bolsa">${BOLSAS.map(x=>`<option ${w.bolsa===x?'selected':''}>${x}</option>`).join('')}</select></label>
@@ -1354,7 +1520,7 @@ function accionesHTML(){
         <label class="f">Precio<input type="number" min="0" step="any" inputmode="decimal" data-b="${b}precioRef|s" value="${esc(w.precioRef)}"></label>
         <label class="f">Cambio 1 día %<input type="number" step="any" inputmode="decimal" data-b="${b}cambioRef|pct" value="${esc(w.cambioRef)}"></label>
         <label class="f">Fecha de ese precio<input type="date" data-b="${b}fechaRef|d0" value="${esc(w.fechaRef)}"></label>
-        <label class="f">Fuente<input data-b="${b}fuenteRef|s" value="${esc(w.fuenteRef)}" maxlength="120" placeholder="Ej. Google Finance"></label></div>`)}
+        <label class="f">Fuente<input data-b="${b}fuenteRef|s" value="${esc(w.fuenteRef)}" maxlength="120" placeholder="Ej. Google Finance"></label></div>`)}</div>
     ${bloque}
     <h3 style="margin-top:var(--s4)">Historial de análisis</h3>
     <div style="margin-top:var(--s2)">${historial}</div>
@@ -1369,7 +1535,7 @@ function accionesHTML(){
         <label class="f">Mi veredicto propio<select data-b="${b}veredicto|s">${VERED.map(v=>`<option ${w.veredicto===v?'selected':''}>${v}</option>`).join('')}</select></label></div>
       <div class="row" style="margin-top:var(--s3)"><button type="button" class="ghost" data-a="preguntar" data-q="${esc(`Revisa mi ficha de ${w.ticker}: ¿qué le falta a mi tesis y qué preguntas debería responder antes de decidir? Recuerda que no tienes precios actuales aquí.`)}">Revisar mi tesis con el asesor</button></div>`)}</div>
   </div>`;
-  return `<div class="banner"><p class="small">El análisis usa datos actuales de internet. Como esta página no puede buscar en la web, “Analizar” arma un bloque para pegar en un chat con Claude y aquí guardas la respuesta con su fecha. El tablero no muestra precios que no traigan fuente y fecha.</p></div>
+  return monPanel()+`<div class="banner"><p class="small">El análisis usa datos actuales de internet. Como esta página no puede buscar en la web, “Analizar” arma un bloque para pegar en un chat con Claude y aquí guardas la respuesta con su fecha. El tablero no muestra precios que no traigan fuente y fecha.</p></div>
   <div class="split">${izq}${der}</div>`;
 }
 
@@ -1447,7 +1613,7 @@ const TOOL={
   leer_pagos:['Pagos vencidos y de los próximos 30 días, con si el saldo alcanza; pagos programados.',{},()=>({proximos:proximasFechas(30).map(e=>({nombre:e.nombre,fecha:e.f,dias:e.d,monto:e.monto,alcanza:alcanza(e).txt})),programados:S.pagos.map(p=>({nombre:p.nombre,monto:p.monto,frecuencia:p.frecuencia,proximo:p.proximo,cuenta:ctaName(p.cuenta)}))})],
   leer_plan:['Diagnóstico financiero: ingresos por fuente, gasto esencial, deudas, perfil de inversión, objetivos, escalera de prioridades, dinero invertible y bitácora de decisiones.',{},()=>{const D=diagnostico();return{perfil:S.plan,diagnostico_incompleto:D.incompleto,escalera:D.steps.map((s,i)=>({paso:i+1,nombre:s.t,cumplido:s.ok,dato:s.v})),paso_actual:D.actual+1,invertible_hoy:Math.round(D.invertible),decisiones:S.decisiones.slice(0,30)}}],
   leer_negocios:['Ideas de negocio con sus números, escenarios, punto de equilibrio, recuperación y validación.',{},()=>S.ideas.map(i=>{const e=evalIdea(i);return{...i,margen_por_venta:e.mc,punto_equilibrio_ventas:isFinite(e.be)?+e.be.toFixed(1):null,utilidad_mensual_escenarios:e.esc,meses_recuperacion:isFinite(e.pay)?+e.pay.toFixed(1):null,lectura_preliminar:e.v}})],
-  leer_inversiones:['Lista de seguimiento con tesis y checklist, y bitácora de operaciones de trading.',{},()=>({seguimiento:S.watch.map(w=>{const u=anDe(w.id)[0];return{...w,checklist:CHECK11.map((c,k)=>({punto:c,hecho:w.check[k]})),ultimo_analisis:u?{fecha:u.fecha,veredicto:u.veredicto,confianza:u.confianza}:null}}),operaciones:S.trades.slice(-60)})]
+  leer_inversiones:['Lista de seguimiento con tesis y checklist, y bitácora de operaciones de trading.',{},()=>({seguimiento:S.watch.map(w=>{const u=anDe(w.id)[0];return{...w,checklist:CHECK11.map((c,k)=>({punto:c,hecho:w.check[k]})),ultimo_analisis:u?{fecha:u.fecha,veredicto:u.veredicto,confianza:u.confianza}:null,monitor:(()=>{const m=monDe(w.id)[0];return m?{revision:m.hora||m.ts,veredicto:m.final,motivo:m.motivo,precio:m.precio||'Sin datos',fuente:m.fuente,referencia:m.ref,umbral:m.umbral,distancia_pct:m.dist,stop:m.stop,perdida_pct:m.perdidaPct,riesgo_beneficio:m.rr}:null})()}}),operaciones:S.trades.slice(-60)})]
 };
 const contextoCompleto=()=>({generado:today(),...snapshotResumen(curYM()),metas:TOOL.leer_metas[2]({}),pagos_30d:TOOL.leer_pagos[2]({}).proximos,plan_detalle:TOOL.leer_plan[2]({}),negocios:TOOL.leer_negocios[2]({}),inversiones:TOOL.leer_inversiones[2]({})});
 let CHAT={busy:false,ctl:null,live:'',tools:[],err:''};
@@ -1620,10 +1786,14 @@ Propón de dónde sacar la diferencia con montos concretos por categoría (que s
   selIdea(b){UI.ideaSel=b.dataset.id;render()},
   borrarIdea(b){const i=byId('ideas',b.dataset.id);if(i)undoable('Idea borrada',()=>{S.ideas=S.ideas.filter(x=>x!==i);UI.ideaSel=null})},
   selWatch(b){UI.watchSel=b.dataset.id;UI.inv.borrar=null;UI.inv.bloque=null;render()},
+  generarMon(){UI.inv.monBloque=true;render();const t=$('#monBloqueTxt');if(t)t.scrollIntoView({block:'center'})},
+  cerrarMon(){UI.inv.monBloque=false;render()},
+  async copiarMon(){const t=$('#monBloqueTxt');if(!t)return;try{await navigator.clipboard.writeText(t.value);toast('Bloque copiado: pégalo en un chat con Claude')}catch(e){t.focus();t.select();toast('Selecciona el texto y cópialo (Ctrl/Cmd + C)')}},
+  monVisto(){S.monitor.visto=ahora();commit('Oportunidades marcadas como vistas')},
   filtroInv(b){UI.inv.filtro=b.dataset.f;render()},
   pedirBorrarWatch(b){UI.inv.borrar=b.dataset.id;render();const y=document.querySelector('[data-a="borrarWatch"]');if(y)y.focus()},
   cancelarBorrar(){UI.inv.borrar=null;render()},
-  borrarWatch(b){const w=byId('watch',b.dataset.id);if(w)undoable(`${w.ticker} eliminada con su historial`,()=>{S.watch=S.watch.filter(x=>x!==w);delete S.analisis[w.id];UI.watchSel=null;UI.inv.borrar=null;UI.inv.bloque=null})},
+  borrarWatch(b){const w=byId('watch',b.dataset.id);if(w)undoable(`${w.ticker} eliminada con su historial`,()=>{S.watch=S.watch.filter(x=>x!==w);delete S.analisis[w.id];delete S.mon[w.id];UI.watchSel=null;UI.inv.borrar=null;UI.inv.bloque=null})},
   analizar(b){UI.inv.bloque=b.dataset.id;render();const t=$('#bloqueTxt');if(t)t.scrollIntoView({block:'center'})},
   cerrarBloque(){UI.inv.bloque=null;render()},
   async copiarBloque(){const t=$('#bloqueTxt');if(!t)return;try{await navigator.clipboard.writeText(t.value);toast('Bloque copiado: pégalo en un chat con Claude')}catch(e){t.focus();t.select();toast('Selecciona el texto y cópialo (Ctrl/Cmd + C)')}},
@@ -1678,6 +1848,8 @@ function bindChange(t){
   else if(type==='bolsa')v=oneOf(t.value,BOLSAS,'OTRA');
   else if(type==='estado')v=t.value==='cartera'?'cartera':'observacion';
   else if(type==='tk'){v=t.value.trim().toUpperCase();if(!tickerOk(v,o.bolsa))return commit(`Ticker no válido para ${o.bolsa}: ${TICKER_HELP[o.bolsa]}. Se dejó el anterior.`,{defer:true})}
+  else if(type==='ref')v=t.value==='compra'?'compra':'max30';
+  else if(type==='umbral'){v=parseFloat(t.value);if(!(isFinite(v)&&v<0&&v>=-90))return commit('El umbral debe ser un porcentaje negativo entre -0.5 y -90. Se dejó el anterior.',{defer:true})}
   else if(type==='pct'){v=t.value.trim();if(v!==''&&!isFinite(parseFloat(v)))v=''}
   else{v=type==='t'?t.value.slice(0,2000):t.value.trim().slice(0,300);if(!v&&(field==='nombre'||field==='ticker'))return commit('El nombre no puede quedar vacío',{defer:true})}
   if(col==='pagos'&&field==='proximo')delete o.dia;
@@ -1701,6 +1873,7 @@ document.addEventListener('change',ev=>{
   if(t.id==='fl_q')return;
   if(t.dataset.b)return bindChange(t);
   if(t.dataset.an){const[wid,aid,field]=t.dataset.an.split('|');const a=anDe(wid).find(x=>x.id===aid);if(a){a[field]=field==='veredicto'?oneOf(t.value,VAN,''):oneOf(t.value,CONF,'');commit('Corrección guardada',{defer:true})}return}
+  if(t.dataset.mon){const v=Math.round(parseFloat(t.value));if(v>=1&&v<=100){S.monitor.maxPct=v;commit(null,{defer:true})}else commit('El máximo por acción debe estar entre 1 y 100 %',{defer:true});return}
   if(t.dataset.map!=null){if(UI.csv)UI.csv.map[+t.dataset.map]=t.value;return}
   if(t.dataset.rev){const m=byId('movs',t.dataset.rev);if(m)setCat(m,t.value);return}
   if(t.dataset.plan){const k=t.dataset.plan.split('.');let o=S.plan;while(k.length>1)o=o[k.shift()];o[k[0]]=t.type==='number'?pos(t.value):t.value.slice(0,200);S.plan=normalize({plan:S.plan}).plan;commit(null,{defer:true});return}
@@ -1745,8 +1918,25 @@ const FORMS={
     const fc=v('ac_f');if(fc&&!isFecha(fc))return toast('La fecha de compra no es válida');
     if(fc&&fc>today())return toast('La fecha de compra no puede ser futura');
     const w={id:uid(),ticker,nombre,bolsa,estado:v('ac_e')==='cartera'?'cartera':'observacion',acciones:pos(v('ac_q')),precioCompra:pos(v('ac_p')),fechaCompra:fc,notas:v('ac_o').slice(0,1000),
-      horizonte:'largo',tesis:'',check:Array(11).fill(false),granEmpresa:false,buenPrecio:false,precioRef:'',fechaRef:'',cambioRef:'',fuenteRef:'',precioAtractivo:'',veredicto:'Sin veredicto'};
+      horizonte:'largo',tesis:'',check:Array(11).fill(false),granEmpresa:false,buenPrecio:false,precioRef:'',fechaRef:'',cambioRef:'',fuenteRef:'',precioAtractivo:'',veredicto:'Sin veredicto',refTipo:'max30',umbral:-5};
     S.watch.push(w);UI.watchSel=w.id;UI.open.delete('nuevaAccion');commit(`${ticker} agregada`)},
+  monForm(v){
+    const t=v('mon_txt');
+    if(t.includes('INSTRUCCIÓN DE ANÁLISIS')&&t.includes('Contexto de mi tablero'))return toast('Eso es el bloque que copiaste, no la respuesta. Pega aquí lo que te contestó Claude.',null,6000);
+    const lineas=parseMonitor(t);if(!lineas.length)return toast('No encontré líneas MONITOR en la respuesta. Pide a Claude que las agregue al final.',null,6000);
+    const key=x=>plain(x).replace(/\s+/g,'');const ts=ahora();const cuenta={};const sin=[];let n=0;
+    for(const d of lineas){
+      const c=S.watch.filter(w=>key(w.ticker)===key(d.ticker));const w=c.length>1?(c.find(x=>x.bolsa===d.bolsa)||c[0]):c[0];
+      if(!w){sin.push(d.ticker);continue}
+      const r=evaluarMon(w,d);
+      const rec={id:uid(),ts,hora:d.hora,fuente:d.fuente,cambio:d.cambio,confianza:d.confianza,tipo:d.tipo_caida,cambiaria:d.cambiaria,...r};
+      S.mon[w.id]=[rec,...monDe(w.id)].slice(0,30);n++;cuenta[r.final]=(cuenta[r.final]||0)+1;
+      if(r.precio&&d.hora){w.precioRef=String(r.precio);w.fechaRef=isFecha(d.hora.slice(0,10))?d.hora.slice(0,10):today();w.cambioRef=r.cambio;w.fuenteRef=d.fuente}
+    }
+    if(!n)return toast('Ninguna línea MONITOR coincide con tus acciones registradas: '+sin.join(', '),null,7000);
+    S.monitor.ultima={ts,n,texto:t.slice(0,20000)};UI.inv.monBloque=false;
+    commit(`Revisión guardada: ${['Oportunidad','Vigilar','Esperar','Evitar','Sin datos'].filter(k=>cuenta[k]).map(k=>cuenta[k]+' '+k.toLowerCase()).join(' · ')}${sin.length?` · sin coincidencia: ${sin.join(', ')}`:''}`);
+  },
   anForm(v){
     const w=byId('watch',UI.inv.bloque);if(!w)return;const t=v('an_txt');
     if(t.includes('INSTRUCCIÓN DE ANÁLISIS')&&t.includes('Contexto de mi tablero'))return toast('Eso es el bloque que copiaste, no la respuesta. Pega aquí lo que te contestó Claude.',null,6000);

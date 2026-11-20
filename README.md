@@ -30,6 +30,19 @@ Además: editar categorías y presupuestos, buscador y filtros de movimientos, d
 
 La página no puede buscar en internet, así que **Analizar** arma un bloque que empieza con "Contexto de mi tablero Asesor Financiero". Se pega en un chat con Claude (la skill `asesor-financiero` busca datos actuales con fuente y fecha) y la respuesta se pega de vuelta para guardarla. El tablero solo muestra precios que traen fuente y fecha, y nunca ejecuta ni simula órdenes.
 
+### Monitor de oportunidades
+
+Revisa todas las acciones contra un umbral de caída configurable por acción (por defecto −5 % contra el máximo de 30 días o el precio de compra). **Generar revisión** arma un bloque para el chat con Claude; la respuesta termina con una línea `MONITOR:` por acción que el tablero lee.
+
+Regla principal: proteger el capital primero. El tablero aplica sus reglas encima del análisis y solo puede bajar un veredicto, nunca subirlo:
+
+- Sin precio con fuente y hora → **Sin datos**.
+- No cruzó el umbral o está subiendo → **Esperar**, con precio de reentrada.
+- Cruzó por deterioro del negocio → **Evitar**.
+- **Oportunidad** solo con caída sana, zona de entrada, stop y riesgo/beneficio de al menos 1:2; siempre muestra la pérdida si falla y el tamaño máximo (10 % de la cartera por defecto).
+
+Incluye banner de oportunidades nuevas, historial de alertas con el precio al aviso y el texto fijo "Análisis informativo; no garantiza resultados." Nunca ejecuta ni simula órdenes.
+
 ## Diseño
 
 Un solo matiz por tema (azul en claro, naranja en oscuro) en una escala de tonos con significado:
